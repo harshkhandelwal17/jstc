@@ -62,9 +62,6 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use(cors(['https://jstc.vercel.app', 'http://localhost:3000']));
 
-// Additional CORS headers for preflight requests
-app.options('*', cors(corsOptions));
-
 
 
 app.use(express.json({ 
