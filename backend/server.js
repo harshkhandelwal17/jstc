@@ -7,9 +7,11 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 
 const validator = require('validator');
 const morgan = require('morgan');
+
 const compression = require('compression'); 
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
@@ -19,9 +21,9 @@ dotenv.config();
 
 // Configure Cloudinary
 cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dcha7gy9o',
+    api_key: process.env.CLOUDINARY_API_KEY || '926234579185835',
+    api_secret: process.env.CLOUDINARY_API_SECRET || 'k-MDaLM8HN1PL2df0RrTrFcME3Q',
 });
 
 // Configure multer for memory storage (for Cloudinary upload)
@@ -97,12 +99,31 @@ app.use(cors({
 // Additional CORS headers for preflight requests
 app.options('*', cors());
 
-// Manual CORS headers as backup
+// Manual CORS headers as backup - Fixed for credentials
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+        'http://localhost:5173', 
+        'http://localhost:3000', 
+        'http://localhost:5174',
+        'https://jstc.vercel.app',
+        'https://jstcapi.vercel.app',
+        'https://www.jstc.vercel.app',
+        'https://jstc-computer-center.vercel.app'
+    ];
+    
+    // Check if origin is allowed
+    if (origin && (allowedOrigins.includes(origin) || origin.includes('vercel.app'))) {
+        res.header('Access-Control-Allow-Origin', origin);
+    } else if (!origin) {
+        // Allow requests with no origin (like mobile apps)
+        res.header('Access-Control-Allow-Origin', '*');
+    }
+    
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Expose-Headers', 'X-Total-Count, X-Page-Count');
     
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -112,7 +133,8 @@ app.use((req, res, next) => {
     next();
 });
 
-
+// Cookie parser middleware
+app.use(cookieParser());
 
 app.use(express.json({ 
     limit: '10mb',

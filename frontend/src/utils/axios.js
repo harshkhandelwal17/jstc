@@ -3,6 +3,7 @@ import axios from 'axios';
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '/api' : 'https://jstcapi.vercel.app/api'),
   timeout: 10000,
+  withCredentials: true, // Enable cookies and credentials
   headers: {
     'Content-Type': 'application/json',
   },
