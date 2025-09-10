@@ -143,7 +143,7 @@ const connectDB = async () => {
             family: 4
         };
 
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/coaching_institute', mongoOptions);
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://harsh:harsh@unifiedcampus.i5fit.mongodb.net/coaching_institute', mongoOptions);
         // MongoDB Connected Successfully
     } catch (error) {
         console.error('❌ MongoDB Connection Error:', error.message);
