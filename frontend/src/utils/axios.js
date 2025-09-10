@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.app/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '/api' : 'https://jstcapi.vercel.app/api'),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

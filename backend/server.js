@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
 const validator = require('validator');
 const morgan = require('morgan');
 const compression = require('compression'); 
@@ -57,10 +58,60 @@ app.use(helmet({
 
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Enhanced CORS configuration
+// Enhanced CORS configuration - Comprehensive fix
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+            'http://localhost:5173', 
+            'http://localhost:3000', 
+            'http://localhost:5174',
+            'https://jstc.vercel.app',
+            'https://jstcapi.vercel.app',
+            'https://www.jstc.vercel.app',
+            'https://jstc-computer-center.vercel.app'
+        ];
+        
+        // Allow all Vercel domains for testing
+        if (origin && origin.includes('vercel.app')) {
+            return callback(null, true);
+        }
+        
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        
+        // Log the blocked origin for debugging
+        console.log('CORS blocked origin:', origin);
+        console.log('Allowed origins:', allowedOrigins);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    credentials: true,
+    optionsSuccessStatus: 200,
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count']
+}));
 
+// Additional CORS headers for preflight requests
+app.options('*', cors());
 
-app.use(cors(['https://jstc.vercel.app', 'http://localhost:3000']));
+// Manual CORS headers as backup
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+    
+    next();
+});
 
 
 
