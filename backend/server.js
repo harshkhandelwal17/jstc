@@ -61,7 +61,7 @@ app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = process.env.ALLOWED_ORIGINS 
             ? process.env.ALLOWED_ORIGINS.split(',') 
-            : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174'];
+            : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174',"https://jstc.vercel.app"];
         
         // Allow requests with no origin (like mobile apps, Postman, etc.)
         if (!origin || allowedOrigins.includes(origin)) {
