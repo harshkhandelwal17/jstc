@@ -57,16 +57,53 @@ app.use(helmet({
 
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-app.use(cors({
+// Enhanced CORS configuration
+const corsOptions = {
     origin: function (origin, callback) {
-        ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174',"https://jstc.vercel.app","https://jstcapi.vercel.app"].includes(origin) ? callback(null, true) : callback(new Error('Not allowed by CORS'));
-            },
-            methods: ['GET', 'POST', 'PUT', 'DELETE'],
-            allowedHeaders: ['Content-Type', 'Authorization'],
-            credentials: true,
-            optionsSuccessStatus: 200,
-            exposedHeaders: ['X-Total-Count', 'X-Page-Count']
-}));
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+            'http://localhost:5173', 
+            'http://localhost:3000', 
+            'http://localhost:5174',
+            'https://jstc.vercel.app',
+            'https://jstcapi.vercel.app',
+            'https://www.jstc.vercel.app',
+            'https://jstc-computer-center.vercel.app'
+        ];
+        
+        // In development, be more permissive
+        if (process.env.NODE_ENV === 'development') {
+            allowedOrigins.push('http://localhost:8080', 'http://127.0.0.1:5173');
+        }
+        
+        // Temporary: Allow all Vercel domains for testing
+        if (origin && origin.includes('vercel.app')) {
+            return callback(null, true);
+        }
+        
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        
+        // Log the blocked origin for debugging
+        console.log('CORS blocked origin:', origin);
+        console.log('Allowed origins:', allowedOrigins);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    credentials: true,
+    optionsSuccessStatus: 200,
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
+    preflightContinue: false
+};
+
+app.use(cors(corsOptions));
+
+// Additional CORS headers for preflight requests
+app.options('*', cors(corsOptions));
 
 
 
