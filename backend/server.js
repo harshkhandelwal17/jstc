@@ -2280,6 +2280,7 @@ app.post('/api/students', authenticateToken, addInstituteFilter, [
     body('feeStructure.courseFee').isFloat({ min: 0 }).withMessage('Course fee must be a positive number')
 ], handleValidationErrors, async (req, res) => {
     try {
+        console.log("Request body:", req.body);
         // Generate unique student ID
         const lastStudent = await Student.findOne({ 
             instituteId: req.user.instituteId 
