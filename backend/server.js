@@ -60,18 +60,12 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(cors({
     origin: function (origin, callback) {
         ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174',"https://jstc.vercel.app","https://jstcapi.vercel.app"].includes(origin) ? callback(null, true) : callback(new Error('Not allowed by CORS'));
-        
-        // Allow requests with no origin (like mobile apps, Postman, etc.)
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`CORS blocked request from origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    optionsSuccessStatus: 200,
-    exposedHeaders: ['X-Total-Count', 'X-Page-Count']
+            },
+            methods: ['GET', 'POST', 'PUT', 'DELETE'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+            credentials: true,
+            optionsSuccessStatus: 200,
+            exposedHeaders: ['X-Total-Count', 'X-Page-Count']
 }));
 
 
