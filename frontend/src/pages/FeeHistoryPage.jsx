@@ -37,7 +37,7 @@ const FeeHistoryPage = () => {
   // Get student ID from URL params (you'll need to implement this based on your routing)
   const studentId = window.location.pathname.split('/').pop();
   
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstc.vercel.app/api';
   const feeTypes = ['Course_Fee', 'Installment', 'Back_Subject', 'Late_Fee', 'Other'];
 
   useEffect(() => {

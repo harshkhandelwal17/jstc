@@ -44,7 +44,7 @@ const StudentDetailsPage = () => {
   // Get student ID from URL params
   const studentId = window.location.pathname.split('/').pop();
   
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstc.vercel.app/api';
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: User },

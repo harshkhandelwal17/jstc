@@ -1276,6 +1276,10 @@ const handleValidationErrors = (req, res, next) => {
     next();
 };
 
+app.get('/', (req, res) => {
+    res.send('Coaching Management System API is running');
+});
+
 // ================== AUTH ROUTES ==================
 app.post('/api/auth/login',  [
     body('email').isEmail().withMessage('Invalid email format').normalizeEmail(),

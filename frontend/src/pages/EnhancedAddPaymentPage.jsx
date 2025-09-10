@@ -54,7 +54,7 @@ const EnhancedAddPaymentPage = () => {
 
   const [errors, setErrors] = useState({});
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstc.vercel.app/api';
 
   const getFeeTypes = () => [
     { value: 'Course_Fee', label: 'Semester Fee', description: 'Regular semester fees', color: 'blue' },

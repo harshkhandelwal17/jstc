@@ -45,7 +45,7 @@ const StudentsPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
   
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstc.vercel.app/api';
   const courses = ['PGDCA', 'DCA'];
   const statuses = ['Active', 'Inactive', 'Completed', 'Dropped', 'Suspended'];
   const feeStatuses = ['Paid', 'Pending', 'Partial'];
