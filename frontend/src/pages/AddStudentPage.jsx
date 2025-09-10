@@ -68,7 +68,7 @@ const AddStudentPage = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstc.vercel.app/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.appapi';
 
   useEffect(() => {
     fetchCourses();
