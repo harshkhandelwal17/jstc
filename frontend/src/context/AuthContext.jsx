@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.appapi';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.app/api';
 
   useEffect(() => {
     checkAuthStatus();
