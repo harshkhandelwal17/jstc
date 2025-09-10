@@ -6,7 +6,7 @@ const dotenv = require('dotenv');
 const helmet = require('helmet'); 
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken'); 
 const cookieParser = require('cookie-parser');
 
 const validator = require('validator');
