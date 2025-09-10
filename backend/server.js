@@ -71,7 +71,6 @@ app.use(cors({
             'https://jstc.vercel.app',
             'https://jstcapi.vercel.app',
             'https://www.jstc.vercel.app',
-            'https://jstc-computer-center.vercel.app'
         ];
         
         // Allow all Vercel domains for testing
