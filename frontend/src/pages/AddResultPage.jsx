@@ -43,7 +43,7 @@ const AddResultPage = () => {
   const [errors, setErrors] = useState({});
   const [preview, setPreview] = useState(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.app/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.onrender.com/api';
 
   const fetchCourses = useCallback(async () => {
     try {

@@ -39,7 +39,7 @@ const FeesPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [stats, setStats] = useState({});
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.app/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.onrender.com/api';
   const courses = ['PGDCA', 'DCA'];
   const feeTypes = ['Course_Fee', 'Installment', 'Back_Subject', 'Late_Fee', 'Other'];
 

@@ -71,7 +71,7 @@ app.use(cors({
             'http://localhost:3000', 
             'http://localhost:5174',
             'https://jstc.vercel.app',
-            'https://jstcapi.vercel.app',
+            'https://jstcapi.onrender.com',
             'https://www.jstc.vercel.app',
         ];
         
@@ -107,7 +107,7 @@ app.use((req, res, next) => {
         'http://localhost:3000', 
         'http://localhost:5174',
         'https://jstc.vercel.app',
-        'https://jstcapi.vercel.app',
+        'https://jstcapi.onrender.com',
         'https://www.jstc.vercel.app',
         'https://jstc-computer-center.vercel.app'
     ];

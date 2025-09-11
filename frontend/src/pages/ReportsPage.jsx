@@ -36,7 +36,7 @@ const ReportsPage = () => {
   const [reportData, setReportData] = useState({});
   const [showFilters, setShowFilters] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.vercel.app/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.onrender.com/api';
   const courses = ['PGDCA', 'DCA'];
 
   const reportTypes = [
