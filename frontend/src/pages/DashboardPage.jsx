@@ -49,7 +49,7 @@ const Dashboard = () => {
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
-      setRefreshing(true);
+      setRefreshing(true); 
       const token = localStorage.getItem('token');
       
       if (!token) {
