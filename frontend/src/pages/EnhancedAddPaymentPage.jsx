@@ -375,6 +375,13 @@ const EnhancedAddPaymentPage = () => {
           }
           
           alert(successMessage);
+          
+          // Refresh payment status after successful payments
+          if (formData.studentId) {
+            setTimeout(() => {
+              fetchStudentPaymentStatus(formData.studentId);
+            }, 1000); // Wait 1 second for database sync
+          }
         } else {
           throw new Error('All back subject payments failed');
         }
@@ -426,9 +433,11 @@ const EnhancedAddPaymentPage = () => {
         const data = await response.json();
         alert(`✅ ${data.message}\nReceipt: ${data.receiptNo || data.payment?.receiptNo}`);
         
-        // Refresh payment status
+        // Refresh payment status after successful payment
         if (formData.studentId) {
-          fetchStudentPaymentStatus(formData.studentId);
+          setTimeout(() => {
+            fetchStudentPaymentStatus(formData.studentId);
+          }, 1000); // Wait 1 second for database sync
         }
         
         // Reset form

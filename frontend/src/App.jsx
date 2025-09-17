@@ -3,12 +3,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Debug storage wrapper (load early) 
+import './utils/debugStorage';
+import './utils/cookieTest';
+import './utils/apiTest';
+
 // Context
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Pages
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
+import DashboardPage from './pages/DashboardPage'; 
 import StudentsPage from './pages/StudentsPage';
 import AddStudentPage from './pages/AddStudentPage';
 import EditStudentPage from './pages/EditStudentPage';

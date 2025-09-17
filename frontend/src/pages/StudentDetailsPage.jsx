@@ -141,10 +141,12 @@ const StudentDetailsPage = () => {
       }
 
       const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // Include cookies
       });
 
       if (!response.ok) {
@@ -203,15 +205,38 @@ const StudentDetailsPage = () => {
       }
 
       const response = await fetch(`${API_BASE_URL}/students/${studentId}/payment-status`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // Include cookies
       });
 
       if (response.ok) {
         const data = await response.json();
         setPaymentStatus(data.paymentStatus);
+      } else if (response.status === 401) {
+        // Check if it's a genuine auth error
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || '';
+        
+        const tokenErrors = ['Access token required', 'Invalid token', 'Token expired', 'Authentication error'];
+        const isAuthError = tokenErrors.some(tokenError => 
+          errorMessage.toLowerCase().includes(tokenError.toLowerCase())
+        );
+        
+        console.warn('STUDENT DETAILS PAGE: 401 error but not redirecting (temporarily disabled)');
+        console.warn('Payment status API returned 401:', errorMessage);
+        
+        // if (isAuthError) {
+        //   localStorage.removeItem('token');
+        //   window.location.href = '/login';
+        // } else {
+        //   console.warn('Payment status API returned 401 but not an auth error:', errorMessage);
+        // }
+      } else {
+        console.warn(`Payment status API error ${response.status}`);
       }
     } catch (error) {
       console.error('Error fetching payment status:', error);

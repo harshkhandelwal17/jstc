@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import Cookies from "js-cookie";
 import { 
   AlertTriangle,
   CheckCircle,
@@ -43,10 +44,31 @@ const BackSubjectsPage = () => {
   const fetchBackSubjects = async () => {
     try {
       setLoading(true);
+      console.log('BACK SUBJECTS: Fetching back subjects data...');
+      
       const response = await axiosInstance.get('/reports/back-subjects');
-      setBackSubjects(response.data.data || []);
-    } catch {
-      toast.error('Error loading back subjects');
+      console.log("BACK SUBJECTS: API response:", response);
+      console.log("BACK SUBJECTS: Response data:", response.data);
+      
+      if (response.data.success) {
+        setBackSubjects(response.data.data || []);
+        console.log("BACK SUBJECTS: Data set successfully:", response.data.data?.length || 0, "items");
+      } else {
+        console.error("BACK SUBJECTS: API returned success=false:", response.data.message);
+        toast.error(response.data.message || 'Failed to load back subjects');
+      }
+
+    } catch(error) {
+      console.error('BACK SUBJECTS: Error details:', error);
+      console.error('BACK SUBJECTS: Error response:', error.response?.data);
+      console.error('BACK SUBJECTS: Error status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Error loading back subjects';
+      toast.error(errorMessage);
+      
+      if (error.response?.status === 401) {
+        console.warn('BACK SUBJECTS: 401 error - authentication issue');
+      }
     } finally {
       setLoading(false);
     }

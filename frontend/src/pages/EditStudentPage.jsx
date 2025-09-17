@@ -269,9 +269,36 @@ const EditStudentPage = () => {
 
     try {
       const token = localStorage.getItem('token');
-      console.log('Updating student with data:', formData);
+      
+      // Prepare update data - only include fields that should be updated
+      // Exclude fee structure details to preserve payment history
+      const updateData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        address: formData.address,
+        parentInfo: formData.parentInfo,
+        academicInfo: formData.academicInfo,
+        status: formData.status,
+        notes: formData.notes
+      };
+      
+      // Only include fee structure if the total course fee has actually changed
+      const currentTotalFee = student?.feeStructure?.totalCourseFee || 0;
+      const newTotalFee = formData.feeStructure?.totalCourseFee || 0;
+      
+      if (newTotalFee !== currentTotalFee && newTotalFee > 0) {
+        updateData.feeStructure = {
+          totalCourseFee: newTotalFee,
+          courseFee: newTotalFee // For backward compatibility
+        };
+        console.log(`Fee structure update: ${currentTotalFee} -> ${newTotalFee}`);
+      }
+      
+      console.log('Updating student with data:', updateData);
       console.log('Student ID:', studentId);
-      console.log('API URL:', `${API_BASE_URL}/students/${studentId}`);
       
       const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
         method: 'PUT',
@@ -279,11 +306,8 @@ const EditStudentPage = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(updateData)
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

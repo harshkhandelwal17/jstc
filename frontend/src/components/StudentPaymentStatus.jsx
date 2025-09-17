@@ -16,20 +16,43 @@ import {
 } from 'lucide-react';
 import axiosInstance from '../utils/axios';
 
-const StudentPaymentStatus = ({ studentId }) => {
+const StudentPaymentStatus = ({ studentId, onRefresh, autoRefresh = false }) => {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchPaymentStatus = async () => {
+  const fetchPaymentStatus = async (forceRefresh = false) => {
     try {
-      setRefreshing(true);
-      const response = await axiosInstance.get(`/students/${studentId}/payment-status`);
+      if (forceRefresh) {
+        setRefreshing(true);
+      }
+      const response = await axiosInstance.get(`/students/${studentId}/payment-status?t=${Date.now()}`);
       setPaymentStatus(response.data.paymentStatus);
       setError(null);
+      console.log('Payment status updated:', response.data.paymentStatus);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to fetch payment status');
+      console.error('Error fetching payment status:', err);
+      
+      // Don't set error state for authentication errors as they're handled by interceptor
+      const status = err.response?.status;
+      const message = err.response?.data?.message || '';
+      
+      if (status === 401) {
+        // Check if it's a genuine auth error
+        const tokenErrors = ['Access token required', 'Invalid token', 'Token expired', 'Authentication error'];
+        const isAuthError = tokenErrors.some(tokenError => 
+          message.toLowerCase().includes(tokenError.toLowerCase())
+        );
+        
+        if (!isAuthError) {
+          // This is an API-specific 401, not an auth error
+          setError('Payment status not available');
+        }
+        // If it is an auth error, the interceptor will handle the redirect
+      } else {
+        setError(err.response?.data?.message || err.message || 'Failed to fetch payment status');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -41,6 +64,24 @@ const StudentPaymentStatus = ({ studentId }) => {
       fetchPaymentStatus();
     }
   }, [studentId]);
+
+  // Auto refresh effect
+  useEffect(() => {
+    if (autoRefresh && studentId) {
+      const interval = setInterval(() => {
+        fetchPaymentStatus(true);
+      }, 30000); // Refresh every 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh, studentId]);
+
+  // Expose refresh function to parent
+  useEffect(() => {
+    if (onRefresh && typeof onRefresh === 'function') {
+      onRefresh(() => fetchPaymentStatus(true));
+    }
+  }, [onRefresh]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
