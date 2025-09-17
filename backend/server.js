@@ -8,10 +8,8 @@ const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
 const cookieParser = require('cookie-parser');
-
+const morgan = require('morgan')
 const validator = require('validator');
-const morgan = require('morgan');
-
 const compression = require('compression'); 
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
@@ -58,7 +56,6 @@ app.use(helmet({
     },
 }));
 
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Enhanced CORS configuration - Comprehensive fix
 app.use(cors({
@@ -75,11 +72,12 @@ app.use(cors({
             'https://www.jstc.vercel.app',
         ];
         
-        // Allow all Vercel domains for testing
+       // Allow all Vercel domains for testing
         if (origin && origin.includes('vercel.app')) {
             return callback(null, true);
         }
         
+
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
@@ -99,6 +97,7 @@ app.use(cors({
 // Additional CORS headers for preflight requests
 app.options('*', cors());
 
+app.use(morgan('dev'));
 // Manual CORS headers as backup - Fixed for credentials
 app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -956,7 +955,8 @@ class BackSubjectManager {
             const semesterInt = parseInt(semester);
             const semesterIndex = semesterInt - 1;
             
-            await Student.findOneAndUpdate(
+            // Update Student collection with improved error handling
+            const studentUpdate = await Student.findOneAndUpdate(
                 { studentId, instituteId },
                 {
                     $set: {
@@ -966,15 +966,21 @@ class BackSubjectManager {
                         [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$[elem].status`]: 'Fee_Paid'
                     },
                     $inc: {
+                        'feeStructure.totalPaid': paymentData.amount,
                         'feeStructure.backSubjectExamFeesPaid': paymentData.amount,
                         [`feeStructure.semesterFees.${semesterIndex}.backSubjectExamFeesPaid`]: paymentData.amount
                     }
                 },
                 { 
                     arrayFilters: [{ 'elem.subjectCode': subjectCode }],
-                    session
+                    session,
+                    new: true
                 }
             );
+
+            if (!studentUpdate) {
+                throw new Error('Failed to update student record - student or subject not found');
+            }
 
             await Result.findOneAndUpdate(
                 { studentId, semester: semesterInt, instituteId },
@@ -1233,20 +1239,29 @@ class BackSubjectManager {
 // Authentication middleware
 const authenticateToken = async (req, res, next) => {
     try {
+    
         const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
+        const cookieToken = req.cookies.token;
+        const headerToken = authHeader && authHeader.split(' ')[1];
+        const token = cookieToken || headerToken;
+
+        console.log("req n cookies ",req.cookies)
         
         if (!token) {
+            console.log('AUTH MIDDLEWARE: No token found');
             return res.status(401).json({ 
                 success: false,
                 message: 'Access token required' 
             });
         }
 
+      
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+       
         
         const admin = await Admin.findById(decoded.id);
         if (!admin || !admin.isActive) {
+            console.log('AUTH MIDDLEWARE: Admin not found or inactive');
             return res.status(403).json({ 
                 success: false,
                 message: 'Account deactivated or not found' 
@@ -1260,22 +1275,27 @@ const authenticateToken = async (req, res, next) => {
             instituteId: admin.instituteId
         };
         
+       
         next();
     } catch (error) {
+        console.log('AUTH MIDDLEWARE: Error during authentication:', error.message);
+        
         if (error.name === 'JsonWebTokenError') {
+            console.log('AUTH MIDDLEWARE: Invalid JWT token');
             return res.status(401).json({ 
                 success: false,
                 message: 'Invalid token' 
             });
         }
         if (error.name === 'TokenExpiredError') {
+            console.log('AUTH MIDDLEWARE: JWT token expired');
             return res.status(401).json({ 
                 success: false,
                 message: 'Token expired' 
             });
         }
         
-        console.error('Authentication error:', error);
+        console.error('AUTH MIDDLEWARE: Authentication error:', error);
         return res.status(500).json({ 
             success: false,
             message: 'Authentication error' 
@@ -1391,6 +1411,17 @@ app.post('/api/auth/login',  [
             { expiresIn: '24h' }
         );
 
+        // Set cookie BEFORE sending response
+        console.log('BACKEND LOGIN: Setting cookie for token');
+        res.cookie('token', token, {
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+            httpOnly: false, // Allow JavaScript access for debugging
+            secure: false, // Set to false for development (HTTP)
+            sameSite: 'lax', // Lax for same-site requests
+            path: '/', // Make cookie available for entire domain
+        });
+        console.log('BACKEND LOGIN: Cookie set successfully');
+
         // Response with admin details (excluding password)
         const adminResponse = {
             id: admin._id,
@@ -1505,6 +1536,17 @@ app.post('/api/auth/register', [
             { expiresIn: '24h' }
         );
 
+        // Set cookie BEFORE sending response
+        console.log('BACKEND REGISTER: Setting cookie for token');
+        res.cookie('token', token, {
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+            httpOnly: false, // Allow JavaScript access for debugging
+            secure: false, // Set to false for development (HTTP)
+            sameSite: 'lax', // Lax for same-site requests
+            path: '/', // Make cookie available for entire domain
+        });
+        console.log('BACKEND REGISTER: Cookie set successfully');
+
         res.status(201).json({
             success: true,
             message: 'Admin registered successfully',
@@ -1530,8 +1572,14 @@ app.post('/api/auth/register', [
 // Logout endpoint
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     try {
-        // In a stateless JWT system, logout is mainly handled client-side
-        // But we can add server-side logic here if needed (like blacklisting tokens)
+        // Clear the cookie by setting it with an expired date
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            path: '/'
+        });
+
         res.json({
             success: true,
             message: 'Logged out successfully'
@@ -2415,27 +2463,66 @@ app.post('/api/students', authenticateToken, addInstituteFilter, [
 // Update student
 app.put('/api/students/:id', authenticateToken, addInstituteFilter, async (req, res) => {
     try {
-        const student = await Student.findOneAndUpdate(
-            { 
-                studentId: req.params.id,
-                instituteId: req.user.instituteId 
-            },
-            { 
-                ...req.body, 
-                updatedAt: new Date() 
-            },
-            { 
-                new: true, 
-                runValidators: true 
-            }
-        );
-        
-        if (!student) {
+        // First, get the existing student to preserve fee structure
+        const existingStudent = await Student.findOne({
+            studentId: req.params.id,
+            instituteId: req.user.instituteId
+        });
+
+        if (!existingStudent) {
             return res.status(404).json({ 
                 success: false,
                 message: 'Student not found' 
             });
         }
+
+        // Prepare update data while preserving critical fee structure
+        const updateData = { ...req.body, updatedAt: new Date() };
+        
+        // If feeStructure is being updated, preserve existing payment data
+        if (updateData.feeStructure && existingStudent.feeStructure) {
+            // Preserve existing semesterFees with all payment history
+            if (existingStudent.feeStructure.semesterFees) {
+                updateData.feeStructure.semesterFees = existingStudent.feeStructure.semesterFees;
+            }
+            
+            // Preserve existing payment totals
+            updateData.feeStructure.totalPaid = existingStudent.feeStructure.totalPaid || 0;
+            updateData.feeStructure.remainingAmount = existingStudent.feeStructure.remainingAmount || 0;
+            
+            // Only update totalCourseFee if it's different and recalculate accordingly
+            if (updateData.feeStructure.totalCourseFee !== existingStudent.feeStructure.totalCourseFee) {
+                const newTotalFee = updateData.feeStructure.totalCourseFee;
+                const currentPaid = existingStudent.feeStructure.totalPaid || 0;
+                
+                // Recalculate remaining amount
+                updateData.feeStructure.remainingAmount = Math.max(0, newTotalFee - currentPaid);
+                
+                // Update semester fees proportionally if they exist
+                if (existingStudent.feeStructure.semesterFees && existingStudent.feeStructure.semesterFees.length > 0) {
+                    const oldTotalFee = existingStudent.feeStructure.totalCourseFee || 0;
+                    const ratio = oldTotalFee > 0 ? newTotalFee / oldTotalFee : 1;
+                    
+                    updateData.feeStructure.semesterFees = existingStudent.feeStructure.semesterFees.map(semFee => ({
+                        ...semFee,
+                        semesterFee: Math.round(semFee.semesterFee * ratio),
+                        remainingAmount: Math.max(0, Math.round(semFee.semesterFee * ratio) - (semFee.paidAmount || 0))
+                    }));
+                }
+            }
+        }
+
+        const student = await Student.findOneAndUpdate(
+            { 
+                studentId: req.params.id,
+                instituteId: req.user.instituteId 
+            },
+            updateData,
+            { 
+                new: true, 
+                runValidators: true 
+            }
+        );
         
         res.json({ 
             success: true,
@@ -2664,11 +2751,12 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
                     const hasPendingBackSubjects = semesterFee.pendingBackSubjects && 
                         semesterFee.pendingBackSubjects.some(back => !back.feePaid);
                     
-                    if (totalPaid >= semesterFee.semesterFee && !hasPendingBackSubjects) {
+                    // Fix: Check if course fees are fully paid (not total paid)
+                    if (courseFeesPaid >= semesterFee.semesterFee && !hasPendingBackSubjects) {
                         updates[`feeStructure.semesterFees.${i}.status`] = 'Paid';
                     } else if (hasPendingBackSubjects) {
                         updates[`feeStructure.semesterFees.${i}.status`] = 'Back_Pending';
-                    } else if (totalPaid > 0) {
+                    } else if (courseFeesPaid > 0) {
                         updates[`feeStructure.semesterFees.${i}.status`] = 'Partial';
                     }
                 }
@@ -3409,16 +3497,42 @@ app.post('/api/students/:studentId/back-subjects/pay-fee', authenticateToken, ad
             }
         );
         
-        // Update global fee amounts
-        await Student.findOneAndUpdate(
-            { studentId: studentId, instituteId: req.user.instituteId },
-            { 
-                $inc: { 
-                    'feeStructure.remainingAmount': -paymentAmount,
-                    'feeStructure.totalPaid': paymentAmount
-                }
+        // Update global fee amounts with proper calculation
+        const updatedStudent = await Student.findOne({ studentId: studentId, instituteId: req.user.instituteId });
+        if (updatedStudent && updatedStudent.feeStructure) {
+            let totalCourseFee = 0;
+            let totalBackSubjectFees = 0;
+            let totalPaid = updatedStudent.feeStructure.totalPaid || 0;
+            
+            // Calculate total course fee and back subject fees
+            if (updatedStudent.feeStructure.semesterFees) {
+                updatedStudent.feeStructure.semesterFees.forEach(sf => {
+                    if (sf) {
+                        totalCourseFee += (sf.semesterFee || 0);
+                        if (sf.pendingBackSubjects) {
+                            totalBackSubjectFees += sf.pendingBackSubjects.reduce((sum, bs) => {
+                                return sum + (bs.feeAmount || 500);
+                            }, 0);
+                        }
+                    }
+                });
             }
-        );
+            
+            const totalAmount = totalCourseFee + totalBackSubjectFees;
+            const remainingAmount = Math.max(0, totalAmount - totalPaid);
+            
+            await Student.findOneAndUpdate(
+                { studentId: studentId, instituteId: req.user.instituteId },
+                {
+                    $set: {
+                        'feeStructure.remainingAmount': remainingAmount,
+                        'feeStructure.totalCourseFee': totalCourseFee
+                    }
+                }
+            );
+            
+            console.log(`Fee amounts recalculated - Total: ${totalAmount}, Paid: ${totalPaid}, Remaining: ${remainingAmount}`);
+        }
         console.log('Student record updated successfully');
 
         res.json({
@@ -5478,34 +5592,39 @@ app.get('/api/students/:studentId/payment-status', authenticateToken, addInstitu
                     paymentStatus.totalPendingAmount += semesterStatus.courseFeeRemaining;
                 }
 
-                // Back subject fees pending
-                if (semesterFee.pendingBackSubjects && Array.isArray(semesterFee.pendingBackSubjects)) {
-                    semesterFee.pendingBackSubjects.forEach(backSub => {
-                        semesterStatus.pendingBackSubjects.push({
-                            subjectCode: backSub.subjectCode,
-                            subjectName: backSub.subjectName,
-                            feeAmount: backSub.feeAmount,
-                            feePaid: backSub.feePaid,
-                            paymentDate: backSub.paymentDate,
-                            examFeePaid: backSub.examFeePaid,
-                            isCleared: backSub.isCleared,
-                            attempts: backSub.attempts || 0
-                        });
+        // Back subject fees pending - Fixed Logic
+        if (semesterFee.pendingBackSubjects && Array.isArray(semesterFee.pendingBackSubjects)) {
+            semesterFee.pendingBackSubjects.forEach(backSub => {
+                // Ensure proper data structure
+                const backSubjectData = {
+                    subjectCode: backSub.subjectCode,
+                    subjectName: backSub.subjectName,
+                    feeAmount: backSub.feeAmount || 500,
+                    feePaid: Boolean(backSub.feePaid),
+                    paymentDate: backSub.paymentDate,
+                    examFeePaid: Boolean(backSub.examFeePaid),
+                    isCleared: Boolean(backSub.isCleared),
+                    attempts: backSub.attempts || 0,
+                    status: backSub.feePaid ? 'Fee_Paid' : 'Fee_Pending'
+                };
+                
+                semesterStatus.pendingBackSubjects.push(backSubjectData);
 
-                        if (!backSub.feePaid) {
-                            paymentStatus.pendingPayments.push({
-                                type: 'Back_Subject_Fee',
-                                semester,
-                                subjectCode: backSub.subjectCode,
-                                subjectName: backSub.subjectName,
-                                description: `Back subject fee for ${backSub.subjectName}`,
-                                amount: backSub.feeAmount,
-                                priority: 'High'
-                            });
-                            paymentStatus.totalPendingAmount += backSub.feeAmount;
-                        }
+                // Only add to pending if fee is not paid
+                if (!backSub.feePaid) {
+                    paymentStatus.pendingPayments.push({
+                        type: 'Back_Subject_Fee',
+                        semester,
+                        subjectCode: backSub.subjectCode,
+                        subjectName: backSub.subjectName,
+                        description: `Back subject fee for ${backSub.subjectName}`,
+                        amount: backSub.feeAmount || 500,
+                        priority: 'High'
                     });
+                    paymentStatus.totalPendingAmount += (backSub.feeAmount || 500);
                 }
+            });
+        }
 
                 paymentStatus.semesterWiseStatus.push(semesterStatus);
                 }
@@ -5621,15 +5740,16 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
         }
 
         // Update status
-        const totalPaid = (updates[`feeStructure.semesterFees.${semesterIndex}.paidAmount`] || semesterFee.paidAmount || 0);
+        const courseFeesPaid = (updates[`feeStructure.semesterFees.${semesterIndex}.paidAmount`] || semesterFee.paidAmount || 0);
         const hasPendingBackSubjects = semesterFee.pendingBackSubjects && 
             semesterFee.pendingBackSubjects.some(back => !back.feePaid);
         
-        if (totalPaid >= semesterFee.semesterFee && !hasPendingBackSubjects) {
+        // Fix: Check if course fees are fully paid (not total paid)
+        if (courseFeesPaid >= semesterFee.semesterFee && !hasPendingBackSubjects) {
             updates[`feeStructure.semesterFees.${semesterIndex}.status`] = 'Paid';
         } else if (hasPendingBackSubjects) {
             updates[`feeStructure.semesterFees.${semesterIndex}.status`] = 'Back_Pending';
-        } else if (totalPaid > 0) {
+        } else if (courseFeesPaid > 0) {
             updates[`feeStructure.semesterFees.${semesterIndex}.status`] = 'Partial';
         }
 

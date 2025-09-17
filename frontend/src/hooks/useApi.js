@@ -1,24 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { toast } from 'react-toastify';
-
-// Set up axios interceptors for global error handling
-axios.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            // Token expired or invalid
-            localStorage.removeItem('token');
-            toast.error('Session expired. Please login again.');
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 2000);
-        }
-        return Promise.reject(error);
-    }
-);
+import axiosInstance from '../utils/axios';
 
 // Custom hook for API calls with loading, error handling, and caching
+// Uses the configured axiosInstance to avoid interceptor conflicts
 export const useApi = (url, options = {}) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -40,10 +25,7 @@ export const useApi = (url, options = {}) => {
             setLoading(true);
             setError(null);
             
-            const token = localStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            
-            const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}${url}`, { headers });
+            const response = await axiosInstance.get(url);
             
             setData(response.data);
             
@@ -54,7 +36,8 @@ export const useApi = (url, options = {}) => {
             const errorMessage = err.response?.data?.message || 'An error occurred';
             setError(errorMessage);
             
-            if (showToast) {
+            if (showToast && err.response?.status !== 401) {
+                // Don't show toast for 401 errors as axios interceptor handles them
                 toast.error(errorMessage);
             }
             
