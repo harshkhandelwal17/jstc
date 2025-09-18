@@ -212,3 +212,4 @@ const StudentRow = ({ student }) => (
 
 **Users can now easily manage students with a clean, functional interface!** 🚀
 
+

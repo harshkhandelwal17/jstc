@@ -8,6 +8,9 @@ import './utils/debugStorage';
 import './utils/cookieTest';
 import './utils/apiTest';
 
+// Windows 8 compatibility (load early)
+import './utils/windows8Detector';
+
 // Context
 import { AuthProvider, useAuth } from './context/AuthContext';
 

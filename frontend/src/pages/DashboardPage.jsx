@@ -201,7 +201,7 @@ const Dashboard = () => {
               <button
                 onClick={fetchDashboardData}
                 disabled={refreshing}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center windows8-button-fix"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 {refreshing ? 'Refreshing...' : 'Refresh'}
@@ -443,7 +443,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <button 
               onClick={() => navigate('/students/add')}
-              className="flex items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-left border border-blue-200"
+              className="flex items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-left border border-blue-200 windows8-button-fix"
             >
               <div className="p-2 bg-blue-500 rounded-lg mr-3">
                 <UserPlus className="h-5 w-5 text-white" />
@@ -456,7 +456,7 @@ const Dashboard = () => {
 
             <button 
               onClick={() => navigate('/fees/add-payment')}
-              className="flex items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-left border border-green-200"
+              className="flex items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-left border border-green-200 windows8-button-fix"
             >
               <div className="p-2 bg-green-500 rounded-lg mr-3">
                 <Receipt className="h-5 w-5 text-white" />
@@ -469,7 +469,7 @@ const Dashboard = () => {
 
             <button 
               onClick={() => navigate('/results/add')}
-              className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-left border border-purple-200"
+              className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-left border border-purple-200 windows8-button-fix"
             >
               <div className="p-2 bg-purple-500 rounded-lg mr-3">
                 <BookOpenCheck className="h-5 w-5 text-white" />
@@ -482,7 +482,7 @@ const Dashboard = () => {
 
             <button 
               onClick={() => navigate('/reports')}
-              className="flex items-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-left border border-orange-200"
+              className="flex items-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-left border border-orange-200 windows8-button-fix"
             >
               <div className="p-2 bg-orange-500 rounded-lg mr-3">
                 <BarChart3 className="h-5 w-5 text-white" />

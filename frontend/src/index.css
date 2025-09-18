@@ -245,6 +245,130 @@ body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* Windows 8 Compatibility Fixes */
+/* Override gradients with solid colors for Windows 8 */
+@media screen and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  /* IE/Edge specific styles for Windows 8 */
+  .bg-gradient-to-r,
+  .bg-gradient-to-br,
+  .bg-gradient-to-b,
+  .bg-gradient-to-t {
+    background: #2563eb !important;
+  }
+  
+  .from-blue-600,
+  .from-blue-700,
+  .to-purple-600,
+  .to-purple-700,
+  .to-purple-800 {
+    background: #2563eb !important;
+  }
+  
+  /* Button overrides for Windows 8 */
+  button,
+  .btn-primary,
+  .btn-secondary,
+  .btn-success,
+  .btn-warning,
+  .btn-error {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border: 2px solid #1d4ed8 !important;
+    font-weight: bold !important;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.3) !important;
+  }
+  
+  button:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-success:hover,
+  .btn-warning:hover,
+  .btn-error:hover {
+    background: #1d4ed8 !important;
+    border-color: #1e40af !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+  }
+  
+  /* High contrast button styles */
+  button:focus,
+  button:active {
+    background: #1e40af !important;
+    border-color: #1e3a8a !important;
+    outline: 2px solid #ffffff !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* Windows 8 specific overrides */
+@media screen and (max-width: 1920px) {
+  /* Ensure buttons are visible on older Windows systems */
+  button {
+    min-height: 44px !important;
+    min-width: 120px !important;
+    padding: 12px 24px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    border: 2px solid !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+  }
+  
+  /* Primary button styles for Windows 8 */
+  .bg-blue-600,
+  .bg-blue-700,
+  .bg-green-500,
+  .bg-green-600,
+  .bg-purple-500,
+  .bg-purple-600,
+  .bg-red-500,
+  .bg-red-600,
+  .bg-orange-500,
+  .bg-orange-600 {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border: 2px solid #1d4ed8 !important;
+  }
+  
+  /* Hover states for Windows 8 */
+  .hover\:bg-blue-700:hover,
+  .hover\:bg-green-700:hover,
+  .hover\:bg-purple-700:hover,
+  .hover\:bg-red-700:hover,
+  .hover\:bg-orange-700:hover {
+    background: #1d4ed8 !important;
+    border-color: #1e40af !important;
+  }
+}
+
+/* Additional Windows 8 button visibility fixes */
+.windows8-button-fix {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 2px solid #1d4ed8 !important;
+  font-weight: bold !important;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.3) !important;
+  min-height: 44px !important;
+  min-width: 120px !important;
+  padding: 12px 24px !important;
+  font-size: 14px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.windows8-button-fix:hover {
+  background: #1d4ed8 !important;
+  border-color: #1e40af !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+.windows8-button-fix:focus,
+.windows8-button-fix:active {
+  background: #1e40af !important;
+  border-color: #1e3a8a !important;
+  outline: 2px solid #ffffff !important;
+  outline-offset: 2px !important;
+}
+
 /* Table Styles */
 .table-container {
   overflow-x: auto;
