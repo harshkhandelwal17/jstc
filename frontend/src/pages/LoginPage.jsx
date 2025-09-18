@@ -6,7 +6,7 @@ import {
   Eye, 
   EyeOff, 
   Mail, 
-  Lock, 
+  Lock,
   GraduationCap, 
   Users,
   DollarSign,
@@ -301,11 +301,7 @@ const LoginPage = () => {
                   )}
                 </button>
               </div>
-            </form>
-
-            {/* Demo Credentials */}
-            
-
+            </form>            
             {/* Features for Mobile */}
             <div className="lg:hidden mt-12">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Features</h3>
@@ -322,7 +318,7 @@ const LoginPage = () => {
             {/* Footer */}
             <div className="mt-8 text-center">
               <p className="text-xs text-gray-500">
-                © 2024 Coaching Institute Management System. All rights reserved.
+                © 2025 JSTC Coaching Institute . All rights reserved.
               </p>
             </div>
           </div>
@@ -332,4 +328,4 @@ const LoginPage = () => {
   );
 };
 
-export default LoginPage;
+export default LoginPage; 
