@@ -5,7 +5,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // Debug storage wrapper (load early) 
 import './utils/debugStorage';
-import './utils/cookieTest';
+import './utils/cookieTest'; 
 import './utils/apiTest';
 
 // Windows 8 compatibility (load early)
