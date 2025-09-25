@@ -15,7 +15,7 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { body, validationResult, param, query } = require('express-validator');
 
-dotenv.config();
+dotenv.config();        
 
 // Configure Cloudinary
 cloudinary.config({
@@ -670,6 +670,7 @@ const feePaymentSchema = new mongoose.Schema({
         enum: ['PGDCA', 'DCA']
     },
     paymentDate: { type: Date, default: Date.now },
+    submissionDate: { type: Date, default: Date.now },
     feeType: { 
         type: String, 
         enum: {
@@ -2693,6 +2694,7 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
             studentName: student.name,
             course: student.academicInfo.course,
             finalAmount: req.body.amount - (req.body.discount || 0),
+            submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
             createdBy: req.user.id
         };
 
@@ -5704,6 +5706,7 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
                 course: student.academicInfo.course,
                 totalSemesters: student.academicInfo.totalSemesters
             },
+            submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
             remarks: remarks || `Semester ${semester} fee payment`,
             createdBy: req.user.id
         };

@@ -49,7 +49,8 @@ const EnhancedAddPaymentPage = () => {
     },
     discount: 0,
     remarks: '',
-    paymentDate: new Date().toISOString().split('T')[0]
+    paymentDate: new Date().toISOString().split('T')[0],
+    submissionDate: new Date().toISOString().split('T')[0]
   });
 
   const [errors, setErrors] = useState({});
@@ -271,6 +272,18 @@ const EnhancedAddPaymentPage = () => {
     if (formData.feeType === 'Back_Subject' && selectedBackSubjects.length === 0) {
       newErrors.subjectCode = 'At least one back subject must be selected';
     }
+    if (!formData.paymentDate) newErrors.paymentDate = 'Payment date is required';
+    if (!formData.submissionDate) newErrors.submissionDate = 'Submission date is required';
+    
+    // Validate that submission date is not in the future
+    if (formData.submissionDate && new Date(formData.submissionDate) > new Date()) {
+      newErrors.submissionDate = 'Submission date cannot be in the future';
+    }
+    
+    // Validate that payment date is not in the future
+    if (formData.paymentDate && new Date(formData.paymentDate) > new Date()) {
+      newErrors.paymentDate = 'Payment date cannot be in the future';
+    }
 
     // Payment mode specific validations
     if (formData.paymentMode === 'Cheque' && !formData.transactionDetails.chequeNo) {
@@ -308,6 +321,7 @@ const EnhancedAddPaymentPage = () => {
           amount: parseFloat(formData.amount),
           paymentMode: formData.paymentMode,
           transactionDetails: formData.transactionDetails,
+          submissionDate: formData.submissionDate,
           remarks: formData.remarks
         };
       } else if (formData.feeType === 'Back_Subject') {
@@ -416,6 +430,7 @@ const EnhancedAddPaymentPage = () => {
           paymentMode: formData.paymentMode,
           transactionDetails: formData.transactionDetails,
           discount: parseFloat(formData.discount) || 0,
+          submissionDate: formData.submissionDate,
           remarks: formData.remarks
         };
       }
@@ -446,6 +461,8 @@ const EnhancedAddPaymentPage = () => {
           amount: '',
           semester: '',
           remarks: '',
+          paymentDate: new Date().toISOString().split('T')[0],
+          submissionDate: new Date().toISOString().split('T')[0],
           transactionDetails: {
             transactionId: '',
             chequeNo: '',
@@ -877,6 +894,51 @@ const EnhancedAddPaymentPage = () => {
 
                 {/* Payment Mode Specific Fields */}
                 {getPaymentModeFields()}
+
+                {/* Payment Date and Submission Date */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment Date *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Calendar className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="date"
+                        name="paymentDate"
+                        value={formData.paymentDate}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        max={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">When the payment was received</p>
+                    {errors.paymentDate && <p className="mt-1 text-sm text-red-600">{errors.paymentDate}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Submission Date *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="date"
+                        name="submissionDate"
+                        value={formData.submissionDate}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        max={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">When the student submitted the fee</p>
+                    {errors.submissionDate && <p className="mt-1 text-sm text-red-600">{errors.submissionDate}</p>}
+                  </div>
+                </div>
 
                 {/* Remarks */}
                 <div>

@@ -307,10 +307,20 @@ const FeesPage = () => {
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600 flex items-center">
               <Calendar className="h-4 w-4 mr-2" />
-              Date:
+              Payment Date:
             </span>
             <span className="text-sm text-gray-900">{formatDate(payment.paymentDate)}</span>
           </div>
+          
+          {payment.submissionDate && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 flex items-center">
+                <Clock className="h-4 w-4 mr-2" />
+                Submitted:
+              </span>
+              <span className="text-sm text-gray-900">{formatDate(payment.submissionDate)}</span>
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Payment Mode:</span>
