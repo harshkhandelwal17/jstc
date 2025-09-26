@@ -5005,6 +5005,7 @@ app.get('/api/dashboard/stats', authenticateToken, addInstituteFilter, async (re
             collectionStats,
             courseStats,
             recentPayments,
+            allPayments,
             recentResults,
             backSubjectStats
         ] = await Promise.all([
@@ -5027,8 +5028,7 @@ app.get('/api/dashboard/stats', authenticateToken, addInstituteFilter, async (re
                 {
                     $match: {
                         instituteId: req.user.instituteId,
-                        paymentDate: { $gte: startDate, $lte: endDate },
-                        status: 'Paid'
+                        paymentDate: { $gte: startDate, $lte: endDate }
                     }
                 },
                 {
@@ -5047,7 +5047,7 @@ app.get('/api/dashboard/stats', authenticateToken, addInstituteFilter, async (re
                     $group: {
                         _id: '$academicInfo.course',
                         count: { $sum: 1 },
-                        totalFees: { $sum: '$feeStructure.courseFee' },
+                        totalFees: { $sum: '$feeStructure.totalCourseFee' },
                         totalPaid: { $sum: '$feeStructure.totalPaid' },
                         totalPending: { $sum: '$feeStructure.remainingAmount' }
                     }
@@ -5056,12 +5056,18 @@ app.get('/api/dashboard/stats', authenticateToken, addInstituteFilter, async (re
             
             // Recent payments
             FeePayment.find({ 
-                instituteId: req.user.instituteId,
-                status: 'Paid'
+                instituteId: req.user.instituteId
             })
                 .sort({ createdAt: -1 })
                 .limit(5)
                 .select('receiptNo studentName finalAmount paymentDate feeType course')
+                .lean(),
+            
+            // All payments for today's collection calculation
+            FeePayment.find({ 
+                instituteId: req.user.instituteId
+            })
+                .select('finalAmount paymentDate')
                 .lean(),
             
             // Recent results
@@ -5131,6 +5137,9 @@ app.get('/api/dashboard/stats', authenticateToken, addInstituteFilter, async (re
         });
 
         // Process collection stats
+        console.log('Dashboard - Collection stats:', collectionStats);
+        console.log('Dashboard - Recent payments count:', recentPayments.length);
+        
         collectionStats.forEach(stat => {
             processedStats.collection.total += stat.totalAmount;
             processedStats.collection.byFeeType[stat._id] = {
@@ -5140,9 +5149,26 @@ app.get('/api/dashboard/stats', authenticateToken, addInstituteFilter, async (re
         });
 
         // Calculate today's collection
-        const today = new Date().toDateString();
-        processedStats.collection.todaysCollection = recentPayments
-            .filter(payment => new Date(payment.paymentDate).toDateString() === today)
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+        
+        const todayPayments = allPayments.filter(payment => {
+            const paymentDate = new Date(payment.paymentDate);
+            return paymentDate >= todayStart && paymentDate < todayEnd;
+        });
+        
+        console.log('Dashboard - Today payments:', {
+            todayStart: todayStart.toISOString(),
+            todayEnd: todayEnd.toISOString(),
+            todayPaymentsCount: todayPayments.length,
+            todayPayments: todayPayments.map(p => ({
+                paymentDate: p.paymentDate,
+                finalAmount: p.finalAmount
+            }))
+        });
+        
+        processedStats.collection.todaysCollection = todayPayments
             .reduce((total, payment) => total + payment.finalAmount, 0);
 
         // Process course stats
