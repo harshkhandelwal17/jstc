@@ -2755,80 +2755,39 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
         const payment = new FeePayment(paymentData);
         await payment.save();
 
-        // Update student fee structure with priority-based payment
-        if (req.body.feeType === 'Course_Fee' || req.body.feeType === 'Installment') {
-            const student = await Student.findOne(
-                { studentId: req.body.studentId, instituteId: req.user.instituteId }
-            );
+        // Update student fee structure using centralized functions
+        try {
+            console.log('Payment creation - Updating fee structure for:', {
+                studentId: req.body.studentId,
+                feeType: req.body.feeType,
+                amount: paymentData.finalAmount,
+                semester: req.body.semester
+            });
             
-            if (student && student.feeStructure.semesterFees) {
-                let remainingPayment = paymentData.finalAmount;
-                const updates = {};
-                
-                // Priority-based payment: Course fees first, then back subject fees
-                for (let i = 0; i < student.feeStructure.semesterFees.length && remainingPayment > 0; i++) {
-                    const semesterFee = student.feeStructure.semesterFees[i];
-                    
-                    // Priority 1: Pay course fees for this semester
-                    const courseFeeRemaining = semesterFee.semesterFee - (semesterFee.paidAmount || 0);
-                    if (courseFeeRemaining > 0 && remainingPayment > 0) {
-                        const courseFeePayment = Math.min(remainingPayment, courseFeeRemaining);
-                        
-                        updates[`feeStructure.semesterFees.${i}.paidAmount`] = 
-                            (semesterFee.paidAmount || 0) + courseFeePayment;
-                        updates[`feeStructure.semesterFees.${i}.remainingAmount`] = 
-                            (semesterFee.remainingAmount || semesterFee.semesterFee) - courseFeePayment;
-                        updates[`feeStructure.semesterFees.${i}.lastPaymentDate`] = paymentDate;
-                        
-                        remainingPayment -= courseFeePayment;
-                    }
-                    
-                    // Priority 2: Pay pending back subject fees for this semester
-                    if (semesterFee.pendingBackSubjects && semesterFee.pendingBackSubjects.length > 0) {
-                        for (let j = 0; j < semesterFee.pendingBackSubjects.length && remainingPayment > 0; j++) {
-                            const backSubject = semesterFee.pendingBackSubjects[j];
-                            if (!backSubject.feePaid && remainingPayment >= backSubject.feeAmount) {
-                                updates[`feeStructure.semesterFees.${i}.pendingBackSubjects.${j}.feePaid`] = true;
-                                updates[`feeStructure.semesterFees.${i}.pendingBackSubjects.${j}.paymentDate`] = paymentDate;
-                                updates[`feeStructure.semesterFees.${i}.backSubjectFees`] = 
-                                    (semesterFee.backSubjectFees || 0) + backSubject.feeAmount;
-                                remainingPayment -= backSubject.feeAmount;
-                            }
-                        }
-                    }
-                    
-                    // Update semester status
-                    const courseFeesPaid = updates[`feeStructure.semesterFees.${i}.paidAmount`] || semesterFee.paidAmount || 0;
-                    const backSubjectFeesPaid = updates[`feeStructure.semesterFees.${i}.backSubjectFees`] || semesterFee.backSubjectFees || 0;
-                    const totalPaid = courseFeesPaid + backSubjectFeesPaid;
-                    const totalDue = semesterFee.semesterFee + (semesterFee.backSubjectFees || 0);
-                    
-                    // Check if there are pending back subjects
-                    const hasPendingBackSubjects = semesterFee.pendingBackSubjects && 
-                        semesterFee.pendingBackSubjects.some(back => !back.feePaid);
-                    
-                    // Fix: Check if course fees are fully paid (not total paid)
-                    if (courseFeesPaid >= semesterFee.semesterFee && !hasPendingBackSubjects) {
-                        updates[`feeStructure.semesterFees.${i}.status`] = 'Paid';
-                    } else if (hasPendingBackSubjects) {
-                        updates[`feeStructure.semesterFees.${i}.status`] = 'Back_Pending';
-                    } else if (courseFeesPaid > 0) {
-                        updates[`feeStructure.semesterFees.${i}.status`] = 'Partial';
-                    }
-                }
-                
-                await Student.findOneAndUpdate(
-                    { studentId: req.body.studentId, instituteId: req.user.instituteId },
-                    { 
-                        $set: updates,
-                        $inc: { 
-                            'feeStructure.totalPaid': paymentData.finalAmount,
-                            'feeStructure.remainingAmount': -paymentData.finalAmount
-                        }
-                    }
+            if (req.body.feeType === 'Course_Fee' || req.body.feeType === 'Installment') {
+                // For course fees, determine which semester this payment is for
+                const semester = req.body.semester || student.academicInfo?.currentSemester || 1;
+                await updateSemesterFeeStructure(
+                    req.body.studentId, 
+                    req.user.instituteId, 
+                    semester, 
+                    paymentData.finalAmount, 
+                    req.body.feeType, 
+                    paymentDate
+                );
+            } else if (req.body.feeType === 'Back_Subject') {
+                // For back subject fees, determine which semester this payment is for
+                const semester = req.body.semester || student.academicInfo?.currentSemester || 1;
+                await updateSemesterFeeStructure(
+                    req.body.studentId, 
+                    req.user.instituteId, 
+                    semester, 
+                    paymentData.finalAmount, 
+                    req.body.feeType, 
+                    paymentDate
                 );
             } else {
-                // Fallback to legacy structure
+                // For other fee types, just update global structure
                 await Student.findOneAndUpdate(
                     { studentId: req.body.studentId, instituteId: req.user.instituteId },
                     { 
@@ -2838,26 +2797,15 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
                         }
                     }
                 );
+                
+                // Recalculate to ensure consistency
+                await recalculateStudentFees(req.body.studentId, req.user.instituteId);
             }
-        } else if (req.body.feeType === 'Back_Subject') {
-            // Handle back subject exam fees payment
-            const semester = req.body.semester || student.academicInfo?.currentSemester || 1;
             
-            // Mark back subjects as exam fees paid for the specific student
-            await Student.findOneAndUpdate(
-                { studentId: req.body.studentId, instituteId: req.user.instituteId },
-                { 
-                    $inc: { 
-                        'feeStructure.backSubjectExamFeesPaid': paymentData.finalAmount,
-                        [`feeStructure.semesterFees.${semester-1}.backSubjectExamFeesPaid`]: paymentData.finalAmount
-                    },
-                    $set: {
-                        [`results.${semester-1}.backSubjectExamFeesPaid`]: true
-                    }
-                }
-            );
-            
-            console.log(`Back subject exam fees paid: ₹${paymentData.finalAmount} for semester ${semester}`);
+            console.log('Payment creation - Fee structure updated successfully');
+        } catch (error) {
+            console.error('Payment creation - Error updating student fee structure:', error);
+            // Don't fail the payment creation if fee structure update fails
         }
 
         res.status(201).json({ 
@@ -3013,11 +2961,7 @@ async function updateSemesterFeeStructure(studentId, instituteId, semester, amou
                 (semesterFee.backSubjectFees || 0) + amount;
         }
 
-        // Update global fee structure
-        updates['feeStructure.totalPaid'] = (student.feeStructure.totalPaid || 0) + amount;
-        updates['feeStructure.remainingAmount'] = Math.max(0, (student.feeStructure.remainingAmount || 0) - amount);
-
-        // Apply updates
+        // Apply semester-specific updates
         if (Object.keys(updates).length > 0) {
             await Student.findOneAndUpdate(
                 { studentId, instituteId },
@@ -3025,10 +2969,41 @@ async function updateSemesterFeeStructure(studentId, instituteId, semester, amou
             );
         }
 
+        // Update global fee structure using $inc to handle multiple payments correctly
+        await Student.findOneAndUpdate(
+            { studentId, instituteId },
+            { 
+                $inc: { 
+                    'feeStructure.totalPaid': amount,
+                    'feeStructure.remainingAmount': -amount
+                }
+            }
+        );
+
         // Recalculate all fees to ensure consistency
         await recalculateStudentFees(studentId, instituteId);
 
-        console.log(`Semester fee structure updated for ${studentId}, semester ${semester}:`, updates);
+        console.log(`Semester fee structure updated for ${studentId}, semester ${semester}:`, {
+            updates,
+            amount,
+            feeType,
+            paymentDate
+        });
+        
+        // Debug: Log current student fee structure after update
+        const updatedStudent = await Student.findOne({ studentId, instituteId });
+        if (updatedStudent && updatedStudent.feeStructure) {
+            console.log(`Current fee structure for ${studentId}:`, {
+                totalPaid: updatedStudent.feeStructure.totalPaid,
+                remainingAmount: updatedStudent.feeStructure.remainingAmount,
+                semesterFees: updatedStudent.feeStructure.semesterFees?.map((sf, index) => ({
+                    semester: index + 1,
+                    paidAmount: sf.paidAmount,
+                    remainingAmount: sf.remainingAmount,
+                    status: sf.status
+                }))
+            });
+        }
     } catch (error) {
         console.error('Error updating semester fee structure:', error);
         throw error;
