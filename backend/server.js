@@ -2895,6 +2895,224 @@ async function generateReceiptNumber(instituteId) {
     return receiptNo;
 }
 
+// ================== CENTRALIZED FEE CALCULATION UTILITIES ==================
+
+// Recalculate all fee amounts for a student
+async function recalculateStudentFees(studentId, instituteId) {
+    try {
+        console.log(`Recalculating fees for student: ${studentId}`);
+        
+        const student = await Student.findOne({ studentId, instituteId });
+        if (!student || !student.feeStructure) {
+            console.log('Student or fee structure not found');
+            return;
+        }
+
+        let totalCourseFee = 0;
+        let totalBackSubjectFees = 0;
+        let totalPaid = 0;
+        let totalRemaining = 0;
+
+        // Calculate totals from semester fees
+        if (student.feeStructure.semesterFees) {
+            student.feeStructure.semesterFees.forEach((semesterFee, index) => {
+                if (semesterFee) {
+                    // Course fee calculation
+                    const semesterFeeAmount = semesterFee.semesterFee || 0;
+                    const paidAmount = semesterFee.paidAmount || 0;
+                    const remainingAmount = semesterFee.remainingAmount || 0;
+                    
+                    totalCourseFee += semesterFeeAmount;
+                    totalPaid += paidAmount;
+                    totalRemaining += remainingAmount;
+
+                    // Back subject fees calculation
+                    if (semesterFee.pendingBackSubjects) {
+                        semesterFee.pendingBackSubjects.forEach(backSubject => {
+                            if (backSubject && backSubject.feeAmount) {
+                                totalBackSubjectFees += backSubject.feeAmount;
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        // Calculate total amount and remaining
+        const totalAmount = totalCourseFee + totalBackSubjectFees;
+        const calculatedRemaining = Math.max(0, totalAmount - totalPaid);
+
+        // Update student fee structure
+        const updates = {
+            'feeStructure.totalCourseFee': totalCourseFee,
+            'feeStructure.totalBackSubjectFees': totalBackSubjectFees,
+            'feeStructure.totalPaid': totalPaid,
+            'feeStructure.remainingAmount': calculatedRemaining,
+            'feeStructure.totalAmount': totalAmount
+        };
+
+        await Student.findOneAndUpdate(
+            { studentId, instituteId },
+            { $set: updates }
+        );
+
+        console.log(`Fee recalculation completed for ${studentId}:`, {
+            totalCourseFee,
+            totalBackSubjectFees,
+            totalPaid,
+            remainingAmount: calculatedRemaining,
+            totalAmount
+        });
+
+        return {
+            totalCourseFee,
+            totalBackSubjectFees,
+            totalPaid,
+            remainingAmount: calculatedRemaining,
+            totalAmount
+        };
+    } catch (error) {
+        console.error('Error recalculating student fees:', error);
+        throw error;
+    }
+}
+
+// Update semester fee structure after payment
+async function updateSemesterFeeStructure(studentId, instituteId, semester, amount, feeType, paymentDate) {
+    try {
+        const student = await Student.findOne({ studentId, instituteId });
+        if (!student || !student.feeStructure) {
+            throw new Error('Student or fee structure not found');
+        }
+
+        const semesterIndex = semester - 1;
+        const semesterFee = student.feeStructure.semesterFees[semesterIndex];
+        
+        if (!semesterFee) {
+            throw new Error(`Semester ${semester} fee structure not found`);
+        }
+
+        const updates = {};
+        let remainingPayment = amount;
+
+        if (feeType === 'Course_Fee' || feeType === 'Installment') {
+            // Course fee payment
+            const courseFeeRemaining = semesterFee.semesterFee - (semesterFee.paidAmount || 0);
+            if (courseFeeRemaining > 0 && remainingPayment > 0) {
+                const coursePayment = Math.min(remainingPayment, courseFeeRemaining);
+                updates[`feeStructure.semesterFees.${semesterIndex}.paidAmount`] = 
+                    (semesterFee.paidAmount || 0) + coursePayment;
+                updates[`feeStructure.semesterFees.${semesterIndex}.remainingAmount`] = 
+                    courseFeeRemaining - coursePayment;
+                updates[`feeStructure.semesterFees.${semesterIndex}.lastPaymentDate`] = paymentDate;
+                remainingPayment -= coursePayment;
+            }
+        } else if (feeType === 'Back_Subject') {
+            // Back subject fee payment
+            updates[`feeStructure.semesterFees.${semesterIndex}.backSubjectFees`] = 
+                (semesterFee.backSubjectFees || 0) + amount;
+        }
+
+        // Update global fee structure
+        updates['feeStructure.totalPaid'] = (student.feeStructure.totalPaid || 0) + amount;
+        updates['feeStructure.remainingAmount'] = Math.max(0, (student.feeStructure.remainingAmount || 0) - amount);
+
+        // Apply updates
+        if (Object.keys(updates).length > 0) {
+            await Student.findOneAndUpdate(
+                { studentId, instituteId },
+                { $set: updates }
+            );
+        }
+
+        // Recalculate all fees to ensure consistency
+        await recalculateStudentFees(studentId, instituteId);
+
+        console.log(`Semester fee structure updated for ${studentId}, semester ${semester}:`, updates);
+    } catch (error) {
+        console.error('Error updating semester fee structure:', error);
+        throw error;
+    }
+}
+
+// Reverse semester fee structure after payment deletion
+async function reverseSemesterFeeStructure(studentId, instituteId, semester, amount, feeType) {
+    try {
+        const student = await Student.findOne({ studentId, instituteId });
+        if (!student || !student.feeStructure) {
+            throw new Error('Student or fee structure not found');
+        }
+
+        const semesterIndex = semester - 1;
+        const semesterFee = student.feeStructure.semesterFees[semesterIndex];
+        
+        if (!semesterFee) {
+            throw new Error(`Semester ${semester} fee structure not found`);
+        }
+
+        const updates = {};
+
+        if (feeType === 'Course_Fee' || feeType === 'Installment') {
+            // Reverse course fee payment
+            updates[`feeStructure.semesterFees.${semesterIndex}.paidAmount`] = 
+                Math.max(0, (semesterFee.paidAmount || 0) - amount);
+            updates[`feeStructure.semesterFees.${semesterIndex}.remainingAmount`] = 
+                (semesterFee.remainingAmount || 0) + amount;
+        } else if (feeType === 'Back_Subject') {
+            // Reverse back subject fee payment
+            updates[`feeStructure.semesterFees.${semesterIndex}.backSubjectFees`] = 
+                Math.max(0, (semesterFee.backSubjectFees || 0) - amount);
+        }
+
+        // Update global fee structure
+        updates['feeStructure.totalPaid'] = Math.max(0, (student.feeStructure.totalPaid || 0) - amount);
+        updates['feeStructure.remainingAmount'] = (student.feeStructure.remainingAmount || 0) + amount;
+
+        // Apply updates
+        if (Object.keys(updates).length > 0) {
+            await Student.findOneAndUpdate(
+                { studentId, instituteId },
+                { $set: updates }
+            );
+        }
+
+        // Recalculate all fees to ensure consistency
+        await recalculateStudentFees(studentId, instituteId);
+
+        console.log(`Semester fee structure reversed for ${studentId}, semester ${semester}:`, updates);
+    } catch (error) {
+        console.error('Error reversing semester fee structure:', error);
+        throw error;
+    }
+}
+
+// Recalculate all student fees (utility function for data consistency)
+async function recalculateAllStudentFees(instituteId) {
+    try {
+        console.log(`Recalculating fees for all students in institute: ${instituteId}`);
+        
+        const students = await Student.find({ instituteId });
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const student of students) {
+            try {
+                await recalculateStudentFees(student.studentId, instituteId);
+                successCount++;
+            } catch (error) {
+                console.error(`Error recalculating fees for student ${student.studentId}:`, error);
+                errorCount++;
+            }
+        }
+
+        console.log(`Fee recalculation completed: ${successCount} successful, ${errorCount} errors`);
+        return { successCount, errorCount };
+    } catch (error) {
+        console.error('Error recalculating all student fees:', error);
+        throw error;
+    }
+}
+
 // Delete fee payment
 app.delete('/api/fees/payments/:id', authenticateToken, addInstituteFilter, [
     param('id').isMongoId().withMessage('Invalid payment ID')
@@ -2943,73 +3161,56 @@ app.delete('/api/fees/payments/:id', authenticateToken, addInstituteFilter, [
             semesterFees: student.feeStructure?.semesterFees
         });
 
-        // Update global fee structure
-        if (payment.feeType === 'Course_Fee' || payment.feeType === 'Installment') {
-            await Student.findOneAndUpdate(
-                { studentId: payment.studentId, instituteId: req.user.instituteId },
-                { 
-                    $inc: { 
-                        'feeStructure.totalPaid': -payment.finalAmount,
-                        'feeStructure.remainingAmount': payment.finalAmount
-                    }
-                }
-            );
-        } else if (payment.feeType === 'Back_Subject') {
-            await Student.findOneAndUpdate(
-                { studentId: payment.studentId, instituteId: req.user.instituteId },
-                { 
-                    $inc: { 
-                        'feeStructure.backSubjectFees': -payment.finalAmount
-                    }
-                }
-            );
-        }
-
-        // Update semester-specific fee structure
-        if (payment.semesterInfo && payment.semesterInfo.semester) {
-            const semesterIndex = payment.semesterInfo.semester - 1;
-            const updates = {};
-
-            if (payment.feeType === 'Course_Fee' || payment.feeType === 'Installment') {
-                // Reverse course fee payment
-                updates[`feeStructure.semesterFees.${semesterIndex}.paidAmount`] = 
-                    (student.feeStructure.semesterFees[semesterIndex]?.paidAmount || 0) - payment.finalAmount;
-                updates[`feeStructure.semesterFees.${semesterIndex}.remainingAmount`] = 
-                    (student.feeStructure.semesterFees[semesterIndex]?.remainingAmount || 0) + payment.finalAmount;
-            } else if (payment.feeType === 'Back_Subject') {
-                // Reverse back subject fee payment
-                updates[`feeStructure.semesterFees.${semesterIndex}.backSubjectFees`] = 
-                    (student.feeStructure.semesterFees[semesterIndex]?.backSubjectFees || 0) - payment.finalAmount;
-            }
-
-            // Update semester fee structure
-            if (Object.keys(updates).length > 0) {
+        // Use centralized functions for payment deletion
+        try {
+            if (payment.semesterInfo && payment.semesterInfo.semester) {
+                // Use centralized function for semester-specific payments
+                await reverseSemesterFeeStructure(
+                    payment.studentId, 
+                    req.user.instituteId, 
+                    payment.semesterInfo.semester, 
+                    payment.finalAmount, 
+                    payment.feeType
+                );
+            } else {
+                // For payments without semester info, update global structure
                 await Student.findOneAndUpdate(
                     { studentId: payment.studentId, instituteId: req.user.instituteId },
-                    { $set: updates }
+                    { 
+                        $inc: { 
+                            'feeStructure.totalPaid': -payment.finalAmount,
+                            'feeStructure.remainingAmount': payment.finalAmount
+                        }
+                    }
+                );
+                
+                // Recalculate to ensure consistency
+                await recalculateStudentFees(payment.studentId, req.user.instituteId);
+            }
+
+            // Handle back subject payment reversal
+            if (payment.feeType === 'Back_Subject' && payment.backSubjectPayment) {
+                const semesterIndex = payment.backSubjectPayment.semester - 1;
+                const subjectCode = payment.backSubjectPayment.subjectCode;
+
+                // Find and update the specific back subject
+                await Student.findOneAndUpdate(
+                    { 
+                        studentId: payment.studentId, 
+                        instituteId: req.user.instituteId,
+                        [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.subjectCode`]: subjectCode
+                    },
+                    { 
+                        $set: { 
+                            [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$.feePaid`]: false,
+                            [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$.paymentDate`]: null
+                        }
+                    }
                 );
             }
-        }
-
-        // Handle back subject payment reversal
-        if (payment.feeType === 'Back_Subject' && payment.backSubjectPayment) {
-            const semesterIndex = payment.backSubjectPayment.semester - 1;
-            const subjectCode = payment.backSubjectPayment.subjectCode;
-
-            // Find and update the specific back subject
-            await Student.findOneAndUpdate(
-                { 
-                    studentId: payment.studentId, 
-                    instituteId: req.user.instituteId,
-                    [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.subjectCode`]: subjectCode
-                },
-                { 
-                    $set: { 
-                        [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$.feePaid`]: false,
-                        [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$.paymentDate`]: null
-                    }
-                }
-            );
+        } catch (error) {
+            console.error('Error reversing payment effects:', error);
+            // Continue with payment deletion even if reversal fails
         }
 
         await FeePayment.findByIdAndDelete(req.params.id);
@@ -3036,6 +3237,25 @@ app.delete('/api/fees/payments/:id', authenticateToken, addInstituteFilter, [
         res.status(500).json({
             success: false,
             message: 'Error deleting payment'
+        });
+    }
+});
+
+// Recalculate all student fees (admin utility)
+app.post('/api/admin/recalculate-fees', authenticateToken, addInstituteFilter, async (req, res) => {
+    try {
+        const result = await recalculateAllStudentFees(req.user.instituteId);
+        
+        res.json({
+            success: true,
+            message: 'Fee recalculation completed',
+            result
+        });
+    } catch (error) {
+        console.error('Recalculate fees error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error recalculating fees'
         });
     }
 });
@@ -5845,12 +6065,16 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
         // Generate receipt number
         const receiptNo = await generateReceiptNumber(req.user.instituteId);
 
+        // Ensure paymentDate is properly handled - use form date or current date
+        const paymentDate = req.body.paymentDate ? new Date(req.body.paymentDate) : new Date();
+        const submissionDate = req.body.submissionDate ? new Date(req.body.submissionDate) : new Date();
+
         // Debug: Log semester fee payment dates
         console.log('Semester fee payment dates:', {
             formPaymentDate: req.body.paymentDate,
             formSubmissionDate: req.body.submissionDate,
-            finalPaymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
-            finalSubmissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
+            finalPaymentDate: paymentDate,
+            finalSubmissionDate: submissionDate,
             paymentDateType: typeof req.body.paymentDate,
             submissionDateType: typeof req.body.submissionDate
         });
@@ -5872,8 +6096,8 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
                 course: student.academicInfo.course,
                 totalSemesters: student.academicInfo.totalSemesters
             },
-            paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
-            submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
+            paymentDate: paymentDate,
+            submissionDate: submissionDate,
             remarks: remarks || `Semester ${semester} fee payment`,
             createdBy: req.user.id
         };
