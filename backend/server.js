@@ -2912,7 +2912,38 @@ app.delete('/api/fees/payments/:id', authenticateToken, addInstituteFilter, [
             });
         }
 
+        // Debug: Log payment details before deletion
+        console.log('Payment deletion - Payment details:', {
+            paymentId: payment._id,
+            studentId: payment.studentId,
+            feeType: payment.feeType,
+            amount: payment.finalAmount,
+            semester: payment.semesterInfo?.semester,
+            backSubject: payment.backSubjectPayment
+        });
+
         // Reverse the payment effects on student fees
+        const student = await Student.findOne({
+            studentId: payment.studentId,
+            instituteId: req.user.instituteId
+        });
+
+        if (!student) {
+            return res.status(404).json({
+                success: false,
+                message: 'Student not found'
+            });
+        }
+
+        // Debug: Log student fee structure before deletion
+        console.log('Payment deletion - Student fee structure before:', {
+            totalPaid: student.feeStructure?.totalPaid,
+            remainingAmount: student.feeStructure?.remainingAmount,
+            backSubjectFees: student.feeStructure?.backSubjectFees,
+            semesterFees: student.feeStructure?.semesterFees
+        });
+
+        // Update global fee structure
         if (payment.feeType === 'Course_Fee' || payment.feeType === 'Installment') {
             await Student.findOneAndUpdate(
                 { studentId: payment.studentId, instituteId: req.user.instituteId },
@@ -2934,7 +2965,67 @@ app.delete('/api/fees/payments/:id', authenticateToken, addInstituteFilter, [
             );
         }
 
+        // Update semester-specific fee structure
+        if (payment.semesterInfo && payment.semesterInfo.semester) {
+            const semesterIndex = payment.semesterInfo.semester - 1;
+            const updates = {};
+
+            if (payment.feeType === 'Course_Fee' || payment.feeType === 'Installment') {
+                // Reverse course fee payment
+                updates[`feeStructure.semesterFees.${semesterIndex}.paidAmount`] = 
+                    (student.feeStructure.semesterFees[semesterIndex]?.paidAmount || 0) - payment.finalAmount;
+                updates[`feeStructure.semesterFees.${semesterIndex}.remainingAmount`] = 
+                    (student.feeStructure.semesterFees[semesterIndex]?.remainingAmount || 0) + payment.finalAmount;
+            } else if (payment.feeType === 'Back_Subject') {
+                // Reverse back subject fee payment
+                updates[`feeStructure.semesterFees.${semesterIndex}.backSubjectFees`] = 
+                    (student.feeStructure.semesterFees[semesterIndex]?.backSubjectFees || 0) - payment.finalAmount;
+            }
+
+            // Update semester fee structure
+            if (Object.keys(updates).length > 0) {
+                await Student.findOneAndUpdate(
+                    { studentId: payment.studentId, instituteId: req.user.instituteId },
+                    { $set: updates }
+                );
+            }
+        }
+
+        // Handle back subject payment reversal
+        if (payment.feeType === 'Back_Subject' && payment.backSubjectPayment) {
+            const semesterIndex = payment.backSubjectPayment.semester - 1;
+            const subjectCode = payment.backSubjectPayment.subjectCode;
+
+            // Find and update the specific back subject
+            await Student.findOneAndUpdate(
+                { 
+                    studentId: payment.studentId, 
+                    instituteId: req.user.instituteId,
+                    [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.subjectCode`]: subjectCode
+                },
+                { 
+                    $set: { 
+                        [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$.feePaid`]: false,
+                        [`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.$.paymentDate`]: null
+                    }
+                }
+            );
+        }
+
         await FeePayment.findByIdAndDelete(req.params.id);
+
+        // Debug: Log student fee structure after deletion
+        const updatedStudent = await Student.findOne({
+            studentId: payment.studentId,
+            instituteId: req.user.instituteId
+        });
+
+        console.log('Payment deletion - Student fee structure after:', {
+            totalPaid: updatedStudent.feeStructure?.totalPaid,
+            remainingAmount: updatedStudent.feeStructure?.remainingAmount,
+            backSubjectFees: updatedStudent.feeStructure?.backSubjectFees,
+            semesterFees: updatedStudent.feeStructure?.semesterFees
+        });
 
         res.json({
             success: true,
