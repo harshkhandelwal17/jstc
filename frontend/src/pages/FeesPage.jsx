@@ -76,6 +76,17 @@ const FeesPage = () => {
       }
 
       const data = await response.json();
+      
+      // Debug: Log the first payment to see what dates are being received
+      if (data.payments && data.payments.length > 0) {
+        console.log('FeesPage - First payment received:', {
+          paymentDate: data.payments[0].paymentDate,
+          submissionDate: data.payments[0].submissionDate,
+          createdAt: data.payments[0].createdAt,
+          receiptNo: data.payments[0].receiptNo
+        });
+      }
+      
       setPayments(data.payments || []);
       setTotalPages(data.pagination?.totalPages || 1);
       setTotal(data.pagination?.totalItems || 0);
@@ -164,11 +175,21 @@ const FeesPage = () => {
   };
 
   const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    if (!date) return 'N/A';
+    
+    try {
+      // Handle both string and Date objects
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      
+      return dateObj.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', date, error);
+      return 'Invalid Date';
+    }
   };
 
   const formatCurrency = (amount) => {

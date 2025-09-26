@@ -49,8 +49,8 @@ const EnhancedAddPaymentPage = () => {
     },
     discount: 0,
     remarks: '',
-    paymentDate: new Date().toISOString().split('T')[0],
-    submissionDate: new Date().toISOString().split('T')[0]
+    paymentDate: '', // Start empty - user must select
+    submissionDate: '' // Start empty - user must select
   });
 
   const [errors, setErrors] = useState({});
@@ -222,6 +222,18 @@ const EnhancedAddPaymentPage = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
+    // Debug: Log date input changes
+    if (name === 'paymentDate' || name === 'submissionDate') {
+      console.log('Date input change:', {
+        name,
+        value,
+        timestamp: new Date().toISOString(),
+        valueType: typeof value,
+        valueLength: value ? value.length : 0,
+        isValidDate: value ? !isNaN(new Date(value).getTime()) : false
+      });
+    }
+    
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
       setFormData(prev => ({
@@ -307,6 +319,19 @@ const EnhancedAddPaymentPage = () => {
     
     if (!validateForm()) return;
 
+    // Debug: Log form data before processing
+    console.log('Form submission - formData:', {
+      paymentDate: formData.paymentDate,
+      submissionDate: formData.submissionDate,
+      feeType: formData.feeType,
+      studentId: formData.studentId,
+      paymentDateType: typeof formData.paymentDate,
+      submissionDateType: typeof formData.submissionDate,
+      paymentDateLength: formData.paymentDate ? formData.paymentDate.length : 0,
+      submissionDateLength: formData.submissionDate ? formData.submissionDate.length : 0,
+      fullFormData: formData
+    });
+
     setLoading(true);
 
     try {
@@ -321,6 +346,7 @@ const EnhancedAddPaymentPage = () => {
           amount: parseFloat(formData.amount),
           paymentMode: formData.paymentMode,
           transactionDetails: formData.transactionDetails,
+          paymentDate: formData.paymentDate,
           submissionDate: formData.submissionDate,
           remarks: formData.remarks
         };
@@ -337,8 +363,19 @@ const EnhancedAddPaymentPage = () => {
               subjectCode: subject.subjectCode,
               paymentAmount: subject.fee,
               paymentMethod: formData.paymentMode,
+              paymentDate: formData.paymentDate,
+              submissionDate: formData.submissionDate,
               remarks: `${formData.remarks} - ${subject.subjectCode} (${subject.subjectName})`
             };
+            
+            // Debug: Log back subject payload
+            console.log('Back subject payload:', {
+              subject: subject.subjectCode,
+              paymentDate: backSubjectPayload.paymentDate,
+              submissionDate: backSubjectPayload.submissionDate,
+              formPaymentDate: formData.paymentDate,
+              formSubmissionDate: formData.submissionDate
+            });
 
             const subjectResponse = await fetch(backSubjectEndpoint, {
               method: 'POST',
@@ -413,7 +450,8 @@ const EnhancedAddPaymentPage = () => {
           transactionDetails: { transactionId: '', chequeNo: '', bankName: '', upiId: '' },
           discount: 0,
           remarks: '',
-          paymentDate: new Date().toISOString().split('T')[0]
+          paymentDate: '', // Reset to empty
+          submissionDate: '' // Reset to empty
         });
         setSelectedStudent(null);
         setSelectedBackSubjects([]);
@@ -430,9 +468,30 @@ const EnhancedAddPaymentPage = () => {
           paymentMode: formData.paymentMode,
           transactionDetails: formData.transactionDetails,
           discount: parseFloat(formData.discount) || 0,
+          paymentDate: formData.paymentDate,
           submissionDate: formData.submissionDate,
           remarks: formData.remarks
         };
+      }
+
+
+      // Debug: Log the data being sent
+      console.log('Frontend - Sending payment data:', {
+        paymentDate: payload.paymentDate,
+        submissionDate: payload.submissionDate,
+        formPaymentDate: formData.paymentDate,
+        formSubmissionDate: formData.submissionDate,
+        paymentDateType: typeof payload.paymentDate,
+        submissionDateType: typeof payload.submissionDate,
+        payloadKeys: Object.keys(payload),
+        fullPayload: payload
+      });
+      
+      // Validate dates before sending
+      if (!payload.paymentDate || !payload.submissionDate) {
+        alert('Please select both Payment Date and Submission Date');
+        setLoading(false);
+        return;
       }
 
       const response = await fetch(endpoint, {
@@ -461,8 +520,8 @@ const EnhancedAddPaymentPage = () => {
           amount: '',
           semester: '',
           remarks: '',
-          paymentDate: new Date().toISOString().split('T')[0],
-          submissionDate: new Date().toISOString().split('T')[0],
+          paymentDate: '', // Reset to empty
+          submissionDate: '', // Reset to empty
           transactionDetails: {
             transactionId: '',
             chequeNo: '',
@@ -899,7 +958,7 @@ const EnhancedAddPaymentPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Date *
+                      Payment Date * <span className="text-red-500">(Required)</span>
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -910,17 +969,35 @@ const EnhancedAddPaymentPage = () => {
                         name="paymentDate"
                         value={formData.paymentDate}
                         onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.paymentDate ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
                         max={new Date().toISOString().split('T')[0]}
+                        required
                       />
                     </div>
                     <p className="mt-1 text-xs text-gray-600">When the payment was received</p>
                     {errors.paymentDate && <p className="mt-1 text-sm text-red-600">{errors.paymentDate}</p>}
+                    
+                    {/* Debug: Test date setting */}
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const dateStr = yesterday.toISOString().split('T')[0];
+                        setFormData(prev => ({ ...prev, paymentDate: dateStr }));
+                        console.log('Debug: Set payment date to:', dateStr);
+                      }}
+                      className="mt-2 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded"
+                    >
+                      Test: Set Yesterday
+                    </button>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Submission Date *
+                      Submission Date * <span className="text-red-500">(Required)</span>
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -931,12 +1008,30 @@ const EnhancedAddPaymentPage = () => {
                         name="submissionDate"
                         value={formData.submissionDate}
                         onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.submissionDate ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
                         max={new Date().toISOString().split('T')[0]}
+                        required
                       />
                     </div>
                     <p className="mt-1 text-xs text-gray-600">When the student submitted the fee</p>
                     {errors.submissionDate && <p className="mt-1 text-sm text-red-600">{errors.submissionDate}</p>}
+                    
+                    {/* Debug: Test date setting */}
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const twoDaysAgo = new Date();
+                        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+                        const dateStr = twoDaysAgo.toISOString().split('T')[0];
+                        setFormData(prev => ({ ...prev, submissionDate: dateStr }));
+                        console.log('Debug: Set submission date to:', dateStr);
+                      }}
+                      className="mt-2 px-2 py-1 text-xs bg-green-100 text-green-600 rounded"
+                    >
+                      Test: Set 2 Days Ago
+                    </button>
                   </div>
                 </div>
 

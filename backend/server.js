@@ -669,8 +669,8 @@ const feePaymentSchema = new mongoose.Schema({
         required: [true, 'Course is required'],
         enum: ['PGDCA', 'DCA']
     },
-    paymentDate: { type: Date, default: Date.now },
-    submissionDate: { type: Date, default: Date.now },
+    paymentDate: { type: Date },
+    submissionDate: { type: Date },
     feeType: { 
         type: String, 
         enum: {
@@ -2645,6 +2645,7 @@ app.get('/api/fees/payments', authenticateToken, addInstituteFilter, async (req,
 
         const total = await FeePayment.countDocuments(query);
 
+
         res.json({
             success: true,
             payments,
@@ -2688,13 +2689,48 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
         // Generate receipt number
         const receiptNo = await generateReceiptNumber(req.user.instituteId);
 
+        // Ensure paymentDate is properly handled - use form date or current date
+        const paymentDate = req.body.paymentDate ? new Date(req.body.paymentDate) : new Date();
+        const submissionDate = req.body.submissionDate ? new Date(req.body.submissionDate) : new Date();
+        
+        // Debug: Check if dates are empty or invalid
+        console.log('Date validation:', {
+            paymentDateEmpty: !req.body.paymentDate,
+            submissionDateEmpty: !req.body.submissionDate,
+            paymentDateValid: req.body.paymentDate ? !isNaN(new Date(req.body.paymentDate).getTime()) : false,
+            submissionDateValid: req.body.submissionDate ? !isNaN(new Date(req.body.submissionDate).getTime()) : false
+        });
+        
+        // Debug: Log the dates being used
+        console.log('Payment creation dates:', {
+            formPaymentDate: req.body.paymentDate,
+            formSubmissionDate: req.body.submissionDate,
+            finalPaymentDate: paymentDate,
+            finalSubmissionDate: submissionDate,
+            paymentDateISO: paymentDate.toISOString(),
+            submissionDateISO: submissionDate.toISOString(),
+            paymentDateType: typeof req.body.paymentDate,
+            submissionDateType: typeof req.body.submissionDate,
+            paymentDateValue: req.body.paymentDate,
+            submissionDateValue: req.body.submissionDate,
+            fullRequestBody: req.body
+        });
+
         const paymentData = {
-            ...req.body,
             receiptNo,
+            instituteId: req.user.instituteId,
+            studentId: req.body.studentId,
             studentName: student.name,
             course: student.academicInfo.course,
+            amount: req.body.amount,
             finalAmount: req.body.amount - (req.body.discount || 0),
-            submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
+            feeType: req.body.feeType,
+            paymentMode: req.body.paymentMode,
+            transactionDetails: req.body.transactionDetails || {},
+            discount: req.body.discount || 0,
+            remarks: req.body.remarks,
+            paymentDate: paymentDate,
+            submissionDate: submissionDate,
             createdBy: req.user.id
         };
 
@@ -2724,7 +2760,7 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
                             (semesterFee.paidAmount || 0) + courseFeePayment;
                         updates[`feeStructure.semesterFees.${i}.remainingAmount`] = 
                             (semesterFee.remainingAmount || semesterFee.semesterFee) - courseFeePayment;
-                        updates[`feeStructure.semesterFees.${i}.lastPaymentDate`] = new Date();
+                        updates[`feeStructure.semesterFees.${i}.lastPaymentDate`] = paymentDate;
                         
                         remainingPayment -= courseFeePayment;
                     }
@@ -2735,7 +2771,7 @@ app.post('/api/fees/payment', authenticateToken, addInstituteFilter, [
                             const backSubject = semesterFee.pendingBackSubjects[j];
                             if (!backSubject.feePaid && remainingPayment >= backSubject.feeAmount) {
                                 updates[`feeStructure.semesterFees.${i}.pendingBackSubjects.${j}.feePaid`] = true;
-                                updates[`feeStructure.semesterFees.${i}.pendingBackSubjects.${j}.paymentDate`] = new Date();
+                                updates[`feeStructure.semesterFees.${i}.pendingBackSubjects.${j}.paymentDate`] = paymentDate;
                                 updates[`feeStructure.semesterFees.${i}.backSubjectFees`] = 
                                     (semesterFee.backSubjectFees || 0) + backSubject.feeAmount;
                                 remainingPayment -= backSubject.feeAmount;
@@ -3454,6 +3490,14 @@ app.post('/api/students/:studentId/back-subjects/pay-fee', authenticateToken, ad
         const receiptNo = `BS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         console.log('Creating fee payment record with receipt:', receiptNo);
         
+        // Debug: Log the dates being used for back subject payment
+        console.log('Back subject payment dates:', {
+            formPaymentDate: req.body.paymentDate,
+            formSubmissionDate: req.body.submissionDate,
+            finalPaymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
+            finalSubmissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date()
+        });
+        
         const feePayment = new FeePayment({
             receiptNo,
             instituteId: req.user.instituteId,
@@ -3464,6 +3508,8 @@ app.post('/api/students/:studentId/back-subjects/pay-fee', authenticateToken, ad
             finalAmount: paymentAmount,
             paymentMode: paymentMethod || 'Cash',
             feeType: 'Back_Subject',
+            paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
+            submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
             semesterInfo: {
                 semester: semesterInt,
                 course: student.academicInfo.course,
@@ -3492,7 +3538,7 @@ app.post('/api/students/:studentId/back-subjects/pay-fee', authenticateToken, ad
             subjectCode,
             {
                 amount: paymentAmount,
-                paymentDate: new Date(),
+                paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
                 receiptNo: receiptNo,
                 paymentMethod: paymentMethod || 'Cash',
                 remarks: remarks || `Back subject fee payment for ${backSubject.subjectName}`
@@ -5689,6 +5735,16 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
         // Generate receipt number
         const receiptNo = await generateReceiptNumber(req.user.instituteId);
 
+        // Debug: Log semester fee payment dates
+        console.log('Semester fee payment dates:', {
+            formPaymentDate: req.body.paymentDate,
+            formSubmissionDate: req.body.submissionDate,
+            finalPaymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
+            finalSubmissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
+            paymentDateType: typeof req.body.paymentDate,
+            submissionDateType: typeof req.body.submissionDate
+        });
+
         // Create payment record
         const paymentData = {
             receiptNo,
@@ -5706,6 +5762,7 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
                 course: student.academicInfo.course,
                 totalSemesters: student.academicInfo.totalSemesters
             },
+            paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
             submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate) : new Date(),
             remarks: remarks || `Semester ${semester} fee payment`,
             createdBy: req.user.id
@@ -5726,7 +5783,7 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
                 (semesterFee.paidAmount || 0) + coursePayment;
             updates[`feeStructure.semesterFees.${semesterIndex}.remainingAmount`] = 
                 courseFeeRemaining - coursePayment;
-            updates[`feeStructure.semesterFees.${semesterIndex}.lastPaymentDate`] = new Date();
+            updates[`feeStructure.semesterFees.${semesterIndex}.lastPaymentDate`] = paymentDate;
             remainingPayment -= coursePayment;
         }
 
@@ -5736,7 +5793,7 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
                 const backSub = semesterFee.pendingBackSubjects[i];
                 if (!backSub.feePaid && remainingPayment >= backSub.feeAmount) {
                     updates[`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.${i}.feePaid`] = true;
-                    updates[`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.${i}.paymentDate`] = new Date();
+                    updates[`feeStructure.semesterFees.${semesterIndex}.pendingBackSubjects.${i}.paymentDate`] = paymentDate;
                     remainingPayment -= backSub.feeAmount;
                 }
             }
