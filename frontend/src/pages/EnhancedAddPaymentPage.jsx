@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, 
+  ArrowLeft,
   Save, 
-  Search, 
-  User, 
+  Search,
+  User,
   CreditCard,
   DollarSign,
   AlertTriangle,
   CheckCircle,
-  Info,
+  Info, 
   Calendar,
   Receipt,
   Clock,
@@ -53,8 +53,8 @@ const EnhancedAddPaymentPage = () => {
     submissionDate: '' // Start empty - user must select
   });
 
-  const [errors, setErrors] = useState({});
 
+  const [errors, setErrors] = useState({});
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jstcapi.onrender.com/api';
 
   const getFeeTypes = () => [
