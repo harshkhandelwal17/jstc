@@ -83,7 +83,11 @@ const FeesPage = () => {
           paymentDate: data.payments[0].paymentDate,
           submissionDate: data.payments[0].submissionDate,
           createdAt: data.payments[0].createdAt,
-          receiptNo: data.payments[0].receiptNo
+          receiptNo: data.payments[0].receiptNo,
+          paymentDateType: typeof data.payments[0].paymentDate,
+          submissionDateType: typeof data.payments[0].submissionDate,
+          formattedPaymentDate: formatDate(data.payments[0].paymentDate),
+          formattedSubmissionDate: formatDate(data.payments[0].submissionDate)
         });
       }
       
@@ -330,7 +334,9 @@ const FeesPage = () => {
               <Calendar className="h-4 w-4 mr-2" />
               Payment Date:
             </span>
-            <span className="text-sm text-gray-900">{formatDate(payment.paymentDate)}</span>
+            <span className="text-sm text-gray-900" title={`Raw: ${payment.paymentDate}`}>
+              {formatDate(payment.paymentDate)}
+            </span>
           </div>
           
           {payment.submissionDate && (
@@ -339,7 +345,9 @@ const FeesPage = () => {
                 <Clock className="h-4 w-4 mr-2" />
                 Submitted:
               </span>
-              <span className="text-sm text-gray-900">{formatDate(payment.submissionDate)}</span>
+              <span className="text-sm text-gray-900" title={`Raw: ${payment.submissionDate}`}>
+                {formatDate(payment.submissionDate)}
+              </span>
             </div>
           )}
           

@@ -2635,6 +2635,10 @@ app.get('/api/fees/payments', authenticateToken, addInstituteFilter, async (req,
                 $gte: new Date(startDate),
                 $lte: new Date(endDate)
             };
+            console.log('Date range filter applied:', {
+                startDate, endDate,
+                queryPaymentDate: query.paymentDate
+            });
         }
 
         const payments = await FeePayment.find(query)
@@ -2642,8 +2646,22 @@ app.get('/api/fees/payments', authenticateToken, addInstituteFilter, async (req,
             .limit(parseInt(limit))
             .skip((parseInt(page) - 1) * parseInt(limit))
             .lean();
+            
+        // Debug: Log query and sorting
+        console.log('Payments query:', query);
+        console.log('Payments count:', payments.length);
 
         const total = await FeePayment.countDocuments(query);
+        
+        // Debug: Log the first payment to see what dates are being returned
+        if (payments.length > 0) {
+            console.log('Payments API - First payment dates:', {
+                paymentDate: payments[0].paymentDate,
+                submissionDate: payments[0].submissionDate,
+                createdAt: payments[0].createdAt,
+                receiptNo: payments[0].receiptNo
+            });
+        }
 
 
         res.json({
@@ -5709,7 +5727,8 @@ app.post('/api/students/:studentId/pay-semester-fee', authenticateToken, addInst
     try {
         const { studentId } = req.params;
         const { semester, amount, paymentMode, transactionDetails, remarks } = req.body;
-
+        
+        console.log("req body ",req.body)
         const student = await Student.findOne({
             studentId: studentId,
             instituteId: req.user.instituteId
